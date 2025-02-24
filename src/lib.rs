@@ -2,7 +2,43 @@
 #![allow(clippy::unwrap_used)] // FIXME
 #![allow(clippy::missing_panics_doc)] // FIXME
 
-use std::{ffi::CString, path::Path};
+use std::{
+    ffi::{c_char, CString},
+    path::Path,
+};
+
+pub trait Elem: sealed::Elem {}
+
+mod sealed {
+    pub trait Elem {
+        const IO_TYPE: tthresh_sys::IOType;
+    }
+}
+
+impl Elem for u8 {}
+impl sealed::Elem for u8 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_uchar_;
+}
+
+impl Elem for u16 {}
+impl sealed::Elem for u16 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_ushort_;
+}
+
+impl Elem for i32 {}
+impl sealed::Elem for i32 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_int_;
+}
+
+impl Elem for f32 {}
+impl sealed::Elem for f32 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_float_;
+}
+
+impl Elem for f64 {}
+impl sealed::Elem for f64 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_double_;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum IoType {
@@ -20,33 +56,34 @@ pub enum Target {
     PSNR(f64),
 }
 
-pub fn compress(
-    shape: &[u32],
-    input_file: &Path,
-    compressed_file: &Path,
-    io_type: IoType,
+pub fn compress<T: Elem>(
+    data: &[T],
+    shape: &[usize],
     target: Target,
     verbose: bool,
     debug: bool,
-) {
-    let input_file = CString::new(input_file.as_os_str().as_encoded_bytes()).unwrap();
-    let compressed_file = CString::new(compressed_file.as_os_str().as_encoded_bytes()).unwrap();
+) -> Vec<u8> {
+    assert!(shape.len() >= 3);
+    assert_eq!(shape.iter().copied().product::<usize>(), data.len());
+    let shape = shape
+        .iter()
+        .copied()
+        .map(u32::try_from)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    let mut output = std::ptr::null_mut();
+    let mut noutput = 0;
 
     #[allow(unsafe_code)]
     unsafe {
         tthresh_sys::my_compress(
             shape.as_ptr(),
             shape.len(),
-            input_file.as_ptr(),
-            compressed_file.as_ptr(),
-            match io_type {
-                IoType::U8 => c"uchar",
-                IoType::U16 => c"ushort",
-                IoType::I32 => c"int",
-                IoType::F32 => c"float",
-                IoType::F64 => c"double",
-            }
-            .as_ptr(),
+            data.as_ptr().cast::<c_char>(),
+            T::IO_TYPE,
+            std::ptr::from_mut(&mut output),
+            std::ptr::from_mut(&mut noutput),
             match target {
                 Target::Eps(_) => tthresh_sys::Target_eps,
                 Target::RMSE(_) => tthresh_sys::Target_rmse,
@@ -59,6 +96,20 @@ pub fn compress(
             debug,
         );
     }
+
+    let mut compressed = vec![0_u8; noutput];
+
+    #[allow(unsafe_code)]
+    unsafe {
+        std::ptr::copy_nonoverlapping(output.cast::<u8>(), compressed.as_mut_ptr(), noutput);
+    }
+
+    #[allow(unsafe_code)]
+    unsafe {
+        tthresh_sys::dealloc_bytes(output);
+    }
+
+    compressed
 }
 
 pub fn decompress(
@@ -90,15 +141,18 @@ mod tests {
 
     #[test]
     fn compress_decompress() {
-        compress(
+        let data = std::fs::read("tthresh-sys/tthresh/data/3D_sphere_64_uchar.raw")
+            .expect("missing input file");
+        let compressed = compress(
+            data.as_slice(),
             &[64, 64, 64],
-            Path::new("tthresh-sys/tthresh/data/3D_sphere_64_uchar.raw"),
-            Path::new("3D_sphere_64_uchar.compressed"),
-            IoType::U8,
             Target::PSNR(30.0),
             true,
             true,
         );
+        std::fs::write("3D_sphere_64_uchar.compressed", compressed)
+            .expect("writing decompressed data should not fail");
+
         decompress(
             &[64, 64, 64],
             Path::new("3D_sphere_64_uchar.compressed"),

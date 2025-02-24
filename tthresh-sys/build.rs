@@ -32,6 +32,7 @@ fn main() {
         .parse_callbacks(Box::new(cargo_callbacks))
         .allowlist_function("my_compress")
         .allowlist_function("my_decompress")
+        .allowlist_function("dealloc_bytes")
         // MSRV 1.82
         .rust_target(match bindgen::RustTarget::stable(82, 0) {
             Ok(target) => target,
