@@ -34,16 +34,21 @@ void dealloc_bytes(char* bytes) {
     delete[] bytes;
 }
 
-void my_decompress(const uint32_t* ds, size_t nd, const char* compressed_file, const char* output_file, bool verbose, bool debug) {
+void my_decompress(const uint32_t* ds, size_t nd, const uint8_t* input, size_t ninput, char** output, size_t* noutput, IOType* io_type, bool verbose, bool debug) {
     dimensions d;
     for(size_t i = 0; i < nd; ++i) {
         d.s.push_back(ds[i]);
     }
-    if (d.s.size() < 3) {
-        display_error("Specify 3 or more integer sizes after -s (C memory order)");
-    }
 
     vector<Slice> cutout;
 
-    decompress(d, std::string(compressed_file), std::string(output_file), nullptr, cutout, false, verbose, debug);
+    std::stringstream compressed_stream(std::string(reinterpret_cast<const char*>(input), ninput));
+    std::stringstream decompressed_stream;
+
+    *io_type = decompress_stream(d, compressed_stream, decompressed_stream, nullptr, cutout, false, verbose, debug);
+
+    *noutput = decompressed_stream.tellp();
+
+    *output = new char[*noutput];
+    decompressed_stream.read(*output, *noutput);
 }
