@@ -1,0 +1,22 @@
+[package]
+name = "tthresh-sys"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+rust-version = { workspace = true }
+
+[features]
+openmp = ["dep:openmp-sys"]
+
+[dependencies]
+openmp-sys = { workspace = true, optional = true }
+
+[build-dependencies]
+bindgen = { workspace = true, features = ["runtime"] }
+cc = { workspace = true }
+cmake = { workspace = true }
+
+[lints]
+workspace = true

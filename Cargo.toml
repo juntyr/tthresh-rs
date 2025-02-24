@@ -1,0 +1,71 @@
+[workspace]
+resolver = "2"
+members = [
+    "tthresh-sys"
+]
+
+[workspace.package]
+edition = "2021"
+authors = ["Juniper Tyree <juniper.tyree@helsinki.fi>"]
+repository = "https://github.com/juntyr/tthresh-rs"
+license = "MPL-2.0"
+rust-version = "1.76"
+
+[workspace.dependencies]
+# workspace-internal crates
+tthresh = { version = "0.1", path = ".", default-features = false }
+tthresh-sys = { version = "0.1", path = "tthresh-sys", default-features = false }
+
+# crates.io third-party dependencies
+bindgen = { version = "0.71", default-features = false }
+cc = { version = "1.2", default-features = false }
+cmake = { version = "0.1", default-features = false }
+openmp-sys = { version = "1.2", default-features = false }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unstable_features = "forbid"
+unused_crate_dependencies = "warn"
+
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+complexity = { priority = -1, level = "warn" }
+correctness = { priority = -1, level = "warn" }
+nursery = { priority = -1, level = "warn" }
+pedantic = { priority = -1, level = "warn" }
+perf = { priority = -1, level = "warn" }
+style = { priority = -1, level = "warn" }
+suspicious = { priority = -1, level = "warn" }
+
+unwrap_used = "warn"
+expect_used = "warn"
+indexing_slicing = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+module_name_repetitions = "allow"
+
+cargo = { priority = -1, level = "warn" }
+cargo_common_metadata = "warn"
+multiple_crate_versions = "warn"
+
+
+[package]
+name = "tthresh"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+rust-version = { workspace = true }
+
+[features]
+openmp = ["tthresh-sys/openmp"]
+
+[dependencies]
+tthresh-sys = { workspace = true }
+
+[lints]
+workspace = true

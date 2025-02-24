@@ -1,0 +1,3 @@
+[submodule "tthresh-sys/tthresh"]
+	path = tthresh-sys/tthresh
+	url = https://github.com/juntyr/tthresh.git
