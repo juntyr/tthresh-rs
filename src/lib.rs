@@ -113,19 +113,9 @@ pub fn compress<T: Elem>(
     compressed
 }
 
-pub fn decompress<T: Elem>(
-    compressed: &[u8],
-    shape: &[usize],
-    verbose: bool,
-    debug: bool,
-) -> Vec<T> {
-    assert!(shape.len() >= 3);
-    let shape = shape
-        .iter()
-        .copied()
-        .map(u32::try_from)
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+pub fn decompress<T: Elem>(compressed: &[u8], verbose: bool, debug: bool) -> (Vec<T>, Vec<usize>) {
+    let mut ds = std::ptr::null_mut();
+    let mut nd = 0;
 
     let mut output = std::ptr::null_mut();
     let mut noutput = 0;
@@ -134,8 +124,8 @@ pub fn decompress<T: Elem>(
     #[allow(unsafe_code)]
     unsafe {
         tthresh_sys::my_decompress(
-            shape.as_ptr(),
-            shape.len(),
+            std::ptr::from_mut(&mut ds),
+            std::ptr::from_mut(&mut nd),
             compressed.as_ptr(),
             compressed.len(),
             std::ptr::from_mut(&mut output),
@@ -147,6 +137,24 @@ pub fn decompress<T: Elem>(
     }
 
     assert_eq!(io_type, T::IO_TYPE);
+
+    let mut shape = vec![0_u32; nd];
+
+    #[allow(unsafe_code)]
+    unsafe {
+        std::ptr::copy_nonoverlapping(ds, shape.as_mut_ptr(), nd);
+    }
+
+    #[allow(unsafe_code)]
+    unsafe {
+        tthresh_sys::dealloc_shape(ds);
+    }
+
+    let shape = shape
+        .into_iter()
+        .map(usize::try_from)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
     let mut decompressed = vec![T::ZERO; noutput / std::mem::size_of::<T>()];
 
@@ -164,7 +172,7 @@ pub fn decompress<T: Elem>(
         tthresh_sys::dealloc_bytes(output);
     }
 
-    decompressed
+    (decompressed, shape)
 }
 
 #[cfg(test)]
@@ -184,6 +192,7 @@ mod tests {
             true,
         );
 
-        let _decompressed = decompress::<u8>(compressed.as_slice(), &[64, 64, 64], true, true);
+        let (_decompressed, shape) = decompress::<u8>(compressed.as_slice(), true, true);
+        assert_eq!(shape, &[64, 64, 64]);
     }
 }
