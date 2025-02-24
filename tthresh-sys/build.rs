@@ -1,4 +1,6 @@
 #![allow(missing_docs)] // FIXME
+#![allow(clippy::expect_used)] // FIXME
+#![allow(clippy::unwrap_used)] // FIXME
 
 use std::{
     env,
@@ -21,7 +23,10 @@ fn main() {
         .clang_arg("c++")
         .clang_arg("-std=c++11")
         .clang_arg(format!("-I{}", Path::new("tthresh").join("src").display()))
-        .clang_arg(format!("-I{}", Path::new("tthresh").join("external").display()))
+        .clang_arg(format!(
+            "-I{}",
+            Path::new("tthresh").join("external").display()
+        ))
         .header("wrapper.hpp")
         .parse_callbacks(Box::new(cargo_callbacks))
         .allowlist_function("my_main")

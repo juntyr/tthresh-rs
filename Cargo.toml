@@ -19,7 +19,7 @@ tthresh-sys = { version = "0.1", path = "tthresh-sys", default-features = false 
 # crates.io third-party dependencies
 bindgen = { version = "0.71", default-features = false }
 cc = { version = "1.2", default-features = false }
-cmake = { version = "0.1", default-features = false }
+cmake = { version = "0.1.26", default-features = false }
 openmp-sys = { version = "1.2", default-features = false }
 
 [workspace.lints.rust]
@@ -48,7 +48,7 @@ unreachable = "warn"
 module_name_repetitions = "allow"
 
 cargo = { priority = -1, level = "warn" }
-cargo_common_metadata = "warn"
+cargo_common_metadata = "allow" # FIXME
 multiple_crate_versions = "warn"
 
 

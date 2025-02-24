@@ -1,16 +1,21 @@
 #![allow(missing_docs)] // FIXME
+#![allow(clippy::unwrap_used)] // FIXME
+#![allow(clippy::missing_panics_doc)] // FIXME
 
 use std::ffi::{CString, NulError};
 
 use tthresh_sys::my_main;
 
 pub fn tthresh(argv: &[&str]) {
-    let mut argv = argv.iter().copied().map(|a| Ok(CString::new(a)?.into_raw())).collect::<Result<Vec<_>, NulError>>().unwrap();
+    let mut argv = argv
+        .iter()
+        .copied()
+        .map(|a| Ok(CString::new(a)?.into_raw()))
+        .collect::<Result<Vec<_>, NulError>>()
+        .unwrap();
 
     #[allow(unsafe_code)]
-    let result = unsafe {
-        my_main(argv.len().try_into().unwrap(), argv.as_mut_ptr())
-    };
+    let result = unsafe { my_main(argv.len().try_into().unwrap(), argv.as_mut_ptr()) };
 
     assert_eq!(result, 0);
 }
@@ -26,6 +31,22 @@ mod tests {
 
     #[test]
     fn compress() {
-        tthresh(&["tthresh", "-i", "tthresh-sys/tthresh/data/3D_sphere_64_uchar.raw", "-t", "uchar", "-s", "64", "64", "64", "-p", "30", "-c", "3D_sphere_64_uchar.compressed", "-v", "-d"]);
+        tthresh(&[
+            "tthresh",
+            "-i",
+            "tthresh-sys/tthresh/data/3D_sphere_64_uchar.raw",
+            "-t",
+            "uchar",
+            "-s",
+            "64",
+            "64",
+            "64",
+            "-p",
+            "30",
+            "-c",
+            "3D_sphere_64_uchar.compressed",
+            "-v",
+            "-d",
+        ]);
     }
 }
