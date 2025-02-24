@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["tthresh"]};
+window.SIDEBAR_ITEMS = {"enum":["IoType","Target"],"fn":["compress","decompress"]};
