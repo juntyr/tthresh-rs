@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["IoType","Target"],"fn":["compress","decompress"]};
+window.SIDEBAR_ITEMS = {"enum":["IoType","Target"],"fn":["compress","decompress"],"trait":["Elem"]};
