@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["IOType_double_","IOType_float_","IOType_int_","IOType_uchar_","IOType_ushort_","Target_eps","Target_psnr","Target_rmse"],"fn":["dealloc_bytes","my_compress","my_decompress"],"type":["IOType","Target"]};
+window.SIDEBAR_ITEMS = {"constant":["IOType_double_","IOType_float_","IOType_int_","IOType_uchar_","IOType_ushort_","Target_eps","Target_psnr","Target_rmse"],"fn":["dealloc_bytes","dealloc_shape","my_compress","my_decompress"],"type":["IOType","Target"]};
