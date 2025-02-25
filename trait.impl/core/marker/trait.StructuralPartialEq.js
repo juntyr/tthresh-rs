@@ -1,9 +1,9 @@
 (function() {
-    var implementors = Object.fromEntries([["tthresh",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.StructuralPartialEq.html\" title=\"trait core::marker::StructuralPartialEq\">StructuralPartialEq</a> for <a class=\"enum\" href=\"tthresh/enum.ErrorBound.html\" title=\"enum tthresh::ErrorBound\">ErrorBound</a>"]]]]);
+    var implementors = Object.fromEntries([["tthresh",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.StructuralPartialEq.html\" title=\"trait core::marker::StructuralPartialEq\">StructuralPartialEq</a> for <a class=\"enum\" href=\"tthresh/enum.Buffer.html\" title=\"enum tthresh::Buffer\">Buffer</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.StructuralPartialEq.html\" title=\"trait core::marker::StructuralPartialEq\">StructuralPartialEq</a> for <a class=\"enum\" href=\"tthresh/enum.ErrorBound.html\" title=\"enum tthresh::ErrorBound\">ErrorBound</a>"]]]]);
     if (window.register_implementors) {
         window.register_implementors(implementors);
     } else {
         window.pending_implementors = implementors;
     }
 })()
-//{"start":57,"fragment_lengths":[311]}
+//{"start":57,"fragment_lengths":[597]}
