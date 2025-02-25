@@ -7,6 +7,11 @@ repository = { workspace = true }
 license = { workspace = true }
 rust-version = { workspace = true }
 
+description = "Low-level Rust bindings to the tthresh compressor"
+readme = "README.md"
+categories = ["api-bindings", "compression", "encoding"]
+keywords = ["tthresh", "bindgen", "compression", "encoding"]
+
 [features]
 openmp = ["dep:openmp-sys"]
 

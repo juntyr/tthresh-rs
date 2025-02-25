@@ -17,7 +17,7 @@
 
 # tthresh-sys
 
-Low-level bindigs to the [tthresh] compressor.
+Low-level Rust bindigs to the [tthresh] compressor.
 
 [tthresh]: https://github.com/rballester/tthresh
 

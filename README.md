@@ -17,7 +17,7 @@
 
 # tthresh
 
-High-level bindigs to the [tthresh] compressor.
+High-level Rust bindigs to the [tthresh] compressor.
 
 [tthresh]: https://github.com/rballester/tthresh
 
