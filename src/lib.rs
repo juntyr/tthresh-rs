@@ -32,6 +32,7 @@ pub enum ErrorBound {
 }
 
 /// Buffer for typed decompressed data
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 #[allow(missing_docs)]
 pub enum Buffer {
     U8(Vec<u8>),
@@ -50,6 +51,7 @@ pub enum Buffer {
 ///   three-dimensional
 /// - [`Error::InvalidShape`] if the `shape` does not match the `data` length
 /// - [`Error::ExcessiveSize`] if the shape cannot be converted into [`u32`]s
+/// - [`Error::NegativeErrorBound`] if the `target` error bound is negative
 pub fn compress<T: Element>(
     data: &[T],
     shape: &[usize],
@@ -72,6 +74,14 @@ pub fn compress<T: Element>(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| Error::ExcessiveSize)?;
 
+    let target_value = match target {
+        ErrorBound::Eps(v) | ErrorBound::RMSE(v) | ErrorBound::PSNR(v) => v,
+    };
+
+    if target_value < 0.0 {
+        return Err(Error::NegativeErrorBound);
+    }
+
     let mut output = std::ptr::null_mut();
     let mut output_size = 0;
 
@@ -89,9 +99,7 @@ pub fn compress<T: Element>(
                 ErrorBound::RMSE(_) => tthresh_sys::Target_rmse,
                 ErrorBound::PSNR(_) => tthresh_sys::Target_psnr,
             },
-            match target {
-                ErrorBound::Eps(v) | ErrorBound::RMSE(v) | ErrorBound::PSNR(v) => v,
-            },
+            target_value,
             Some(alloc),
             verbose,
             debug,
@@ -112,6 +120,7 @@ pub fn compress<T: Element>(
 ///
 /// Errors with
 /// - [`Error::ExcessiveSize`] if the output shape cannot be converted from [`u32`]s
+/// - [`Error::CorruptedCompressedBytes`] if the `compressed` bytes are corrupted
 pub fn decompress(
     compressed: &[u8],
     verbose: bool,
@@ -125,7 +134,7 @@ pub fn decompress(
     let mut output_length = 0;
 
     #[allow(unsafe_code)] // FFI
-    unsafe {
+    let ok = unsafe {
         tthresh_sys::decompress_buffer(
             compressed.as_ptr(),
             compressed.len(),
@@ -137,7 +146,11 @@ pub fn decompress(
             Some(alloc),
             verbose,
             debug,
-        );
+        )
+    };
+
+    if !ok {
+        return Err(Error::CorruptedCompressedBytes);
     }
 
     #[allow(unsafe_code)]
@@ -180,15 +193,21 @@ pub fn decompress(
 #[derive(Debug, thiserror::Error)]
 /// Errors that can occur during compression and decompression with tthresh
 pub enum Error {
-    /// tthresh can only compress data with at least three dimensions
-    #[error("tthresh can only compress data with at least three dimensions")]
+    /// data must be at least three-dimensional
+    #[error("data must be at least three-dimensional")]
     InsufficientDimensionality,
     /// shape does not match the provided buffer
     #[error("shape does not match the provided buffer")]
     InvalidShape,
-    /// tthresh can only compress data whose shape sizes fit within [0; 2^32 - 1]
-    #[error("tthresh can only compress data whose shape sizes fit within [0; 2^32 - 1]")]
+    /// data shape sizes must fit within [0; 2^32 - 1]
+    #[error("data shape sizes must fit within [0; 2^32 - 1]")]
     ExcessiveSize,
+    /// error bound must be non-negative
+    #[error("error bound must be non-negative")]
+    NegativeErrorBound,
+    /// compressed bytes have been corrupted
+    #[error("compressed bytes have been corrupted")]
+    CorruptedCompressedBytes,
 }
 
 /// Marker trait for element types that can be compressed with tthresh
@@ -248,23 +267,98 @@ extern "C" fn alloc(size: usize, align: usize) -> *mut std::ffi::c_void {
 mod tests {
     use super::*;
 
-    #[test]
-    fn compress_decompress() {
+    fn compress_decompress(target: ErrorBound) {
         let data = std::fs::read("tthresh-sys/tthresh/data/3D_sphere_64_uchar.raw")
             .expect("input file should not be missing");
 
-        let compressed = compress(
-            data.as_slice(),
-            &[64, 64, 64],
-            ErrorBound::PSNR(30.0),
-            true,
-            true,
-        )
-        .expect("compression should not fail");
+        let compressed = compress(data.as_slice(), &[64, 64, 64], target, true, true)
+            .expect("compression should not fail");
 
         let (decompressed, shape) =
             decompress(compressed.as_slice(), true, true).expect("decompression should not fail");
         assert!(matches!(decompressed, Buffer::U8(_)));
         assert_eq!(shape, &[64, 64, 64]);
+    }
+
+    #[test]
+    fn compress_decompress_eps() {
+        compress_decompress(ErrorBound::Eps(0.5));
+    }
+
+    #[test]
+    fn compress_decompress_rmse() {
+        compress_decompress(ErrorBound::RMSE(0.1));
+    }
+
+    #[test]
+    fn compress_decompress_psnr() {
+        compress_decompress(ErrorBound::PSNR(30.0));
+    }
+
+    #[test]
+    fn compress_decompress_u8() {
+        let compressed = compress(&[42_u8], &[1, 1, 1], ErrorBound::RMSE(0.0), true, true)
+            .expect("compression should not fail");
+
+        let (decompressed, shape) =
+            decompress(compressed.as_slice(), true, true).expect("decompression should not fail");
+        assert_eq!(decompressed, Buffer::U8(vec![42]));
+        assert_eq!(shape, &[1, 1, 1]);
+    }
+
+    #[test]
+    fn compress_decompress_u16() {
+        let compressed = compress(&[42_u16], &[1, 1, 1], ErrorBound::RMSE(0.0), true, true)
+            .expect("compression should not fail");
+
+        let (decompressed, shape) =
+            decompress(compressed.as_slice(), true, true).expect("decompression should not fail");
+        assert_eq!(decompressed, Buffer::U16(vec![42]));
+        assert_eq!(shape, &[1, 1, 1]);
+    }
+
+    #[test]
+    fn compress_decompress_i32() {
+        let compressed = compress(&[42_i32], &[1, 1, 1], ErrorBound::RMSE(0.0), true, true)
+            .expect("compression should not fail");
+
+        let (decompressed, shape) =
+            decompress(compressed.as_slice(), true, true).expect("decompression should not fail");
+        assert_eq!(decompressed, Buffer::I32(vec![42]));
+        assert_eq!(shape, &[1, 1, 1]);
+    }
+
+    #[test]
+    fn compress_decompress_f32() {
+        let compressed = compress(&[42.0_f32], &[1, 1, 1], ErrorBound::RMSE(0.0), true, true)
+            .expect("compression should not fail");
+
+        let (decompressed, shape) =
+            decompress(compressed.as_slice(), true, true).expect("decompression should not fail");
+        assert_eq!(decompressed, Buffer::F32(vec![42.0]));
+        assert_eq!(shape, &[1, 1, 1]);
+    }
+
+    #[test]
+    fn compress_decompress_f64() {
+        let compressed = compress(&[42.0_f64], &[1, 1, 1], ErrorBound::RMSE(0.0), true, true)
+            .expect("compression should not fail");
+
+        let (decompressed, shape) =
+            decompress(compressed.as_slice(), true, true).expect("decompression should not fail");
+        assert_eq!(decompressed, Buffer::F64(vec![42.0]));
+        assert_eq!(shape, &[1, 1, 1]);
+    }
+
+    #[test]
+    fn decompress_empty_garbage() {
+        let result = decompress(&[0], true, true);
+        assert!(matches!(result, Err(Error::CorruptedCompressedBytes)));
+    }
+
+    #[test]
+    fn decompress_full_garbage() {
+        let result = decompress(vec![1; 1024].as_slice(), true, true);
+        assert!(matches!(result, Err(Error::CorruptedCompressedBytes)));
     }
 }

@@ -60,7 +60,7 @@ void compress_buffer(
     compressed_stream.read(reinterpret_cast<char*>(*output), *output_size);
 }
 
-void decompress_buffer(
+bool decompress_buffer(
     // input byte buffer
     const uint8_t* input, size_t input_size,
     // output buffer, type, and length (in units of the type)
@@ -82,9 +82,13 @@ void decompress_buffer(
     std::stringstream decompressed_stream(std::ios::in | std::ios::out | std::ios::binary);
 
     // decompress the compressed input stream into the decompressed output stream
-    *output_type = decompress_stream(
-        dims, compressed_stream, decompressed_stream, nullptr, cutout, false, verbose, debug
-    );
+    try {
+        *output_type = decompress_stream(
+            dims, compressed_stream, decompressed_stream, nullptr, cutout, false, verbose, debug
+        );
+    } catch(...) {
+        return false;
+    }
 
     // copy the output shape into a fresh shape buffer
     *shape_size = dims.n;
@@ -133,4 +137,6 @@ void decompress_buffer(
     );
     decompressed_stream.seekg(0, std::ios::beg);
     decompressed_stream.read(*output, *output_length * output_type_size);
+
+    return true;
 }
