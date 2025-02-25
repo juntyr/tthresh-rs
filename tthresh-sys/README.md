@@ -25,7 +25,7 @@ Low-level bindigs to the [tthresh] compressor.
 
 Licensed under the GNU General Public License, Version 3.0 ([LICENSE](LICENSE) or https://www.gnu.org/licenses/gpl-3.0-standalone.html).
 
-tthresh (the [`tthresh`](tthresh) folder) is licensed under the LGPL-3.0 license, see [`tthresh/LICENSE`](tthresh/LICENSE).
+tthresh (the `tthresh` folder) is licensed under the LGPL-3.0 license, see `tthresh/LICENSE`.
 
 ## Funding
 
