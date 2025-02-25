@@ -1,7 +1,7 @@
-#![allow(missing_docs)] // FIXME
-#![allow(clippy::expect_used)] // FIXME
-#![allow(clippy::unwrap_used)] // FIXME
-#![allow(clippy::panic)] // FIXME
+#![expect(missing_docs)]
+#![expect(clippy::expect_used)]
+
+// Adapted from sz3-sys's build script by Robin Ole Heinemann, licensed under GPL-3.0-only.
 
 use std::{
     env,
@@ -15,8 +15,9 @@ fn main() {
     config.define("BUILD_TESTING", "OFF");
     config.build_arg("--version");
 
-    println!("cargo:rerun-if-changed=wrapper.hpp");
-    println!("cargo:rerun-if-changed=tthresh");
+    println!("cargo::rerun-if-changed=lib.cpp");
+    println!("cargo::rerun-if-changed=wrapper.hpp");
+    println!("cargo::rerun-if-changed=tthresh");
 
     let cargo_callbacks = bindgen::CargoCallbacks::new();
     let bindings = bindgen::Builder::default()
@@ -30,19 +31,19 @@ fn main() {
         ))
         .header("wrapper.hpp")
         .parse_callbacks(Box::new(cargo_callbacks))
-        .allowlist_function("my_compress")
-        .allowlist_function("my_decompress")
-        .allowlist_function("dealloc_bytes")
-        .allowlist_function("dealloc_shape")
+        .allowlist_function("compress_buffer")
+        .allowlist_function("decompress_buffer")
         // MSRV 1.82
         .rust_target(match bindgen::RustTarget::stable(82, 0) {
             Ok(target) => target,
+            #[expect(clippy::panic)]
             Err(err) => panic!("{err}"),
         })
         .generate()
         .expect("Unable to generate bindings");
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let out_path =
+        PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR should be set in a build script"));
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
@@ -59,7 +60,7 @@ fn main() {
 
     if cfg!(feature = "openmp") {
         env::var("DEP_OPENMP_FLAG") // set by openmp-sys
-            .unwrap()
+            .expect("DEP_OPENMP_FLAG should be set when compiling with openmp-sys")
             .split(' ')
             .for_each(|f| {
                 build.flag(f);
@@ -74,7 +75,7 @@ fn main() {
                 if i.as_os_str().is_empty() {
                     continue;
                 }
-                println!("cargo:{}", i.display());
+                println!("cargo::{}", i.display());
             }
         }
     }

@@ -17,6 +17,10 @@
 
 # tthresh
 
+High-level bindigs to the [tthresh] compressor.
+
+[tthresh]: https://github.com/rballester/tthresh
+
 ## License
 
 Licensed under the Mozilla Public License, Version 2.0 ([LICENSE](LICENSE) or https://www.mozilla.org/en-US/MPL/2.0/).

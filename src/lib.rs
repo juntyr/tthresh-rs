@@ -1,198 +1,270 @@
-#![allow(missing_docs)] // FIXME
-#![allow(clippy::unwrap_used)] // FIXME
-#![allow(clippy::missing_panics_doc)] // FIXME
-
-pub trait Elem: sealed::Elem {}
-
-mod sealed {
-    pub trait Elem: Copy {
-        const IO_TYPE: tthresh_sys::IOType;
-        const ZERO: Self;
-    }
-}
-
-impl Elem for u8 {}
-impl sealed::Elem for u8 {
-    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_uchar_;
-    const ZERO: Self = 0;
-}
-
-impl Elem for u16 {}
-impl sealed::Elem for u16 {
-    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_ushort_;
-    const ZERO: Self = 0;
-}
-
-impl Elem for i32 {}
-impl sealed::Elem for i32 {
-    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_int_;
-    const ZERO: Self = 0;
-}
-
-impl Elem for f32 {}
-impl sealed::Elem for f32 {
-    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_float_;
-    const ZERO: Self = 0.0;
-}
-
-impl Elem for f64 {}
-impl sealed::Elem for f64 {
-    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_double_;
-    const ZERO: Self = 0.0;
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum IoType {
-    U8,
-    U16,
-    I32,
-    F32,
-    F64,
-}
+//! [![CI Status]][workflow] [![MSRV]][repo] [![Latest Version]][crates.io]
+//! [![Rust Doc Crate]][docs.rs] [![Rust Doc Main]][docs]
+//!
+//! [CI Status]: https://img.shields.io/github/actions/workflow/status/juntyr/tthresh-rs/ci.yml?branch=main
+//! [workflow]: https://github.com/juntyr/tthresh-rs/actions/workflows/ci.yml?query=branch%3Amain
+//!
+//! [MSRV]: https://img.shields.io/badge/MSRV-1.82.0-blue
+//! [repo]: https://github.com/juntyr/tthresh-rs
+//!
+//! [Latest Version]: https://img.shields.io/crates/v/tthresh
+//! [crates.io]: https://crates.io/crates/tthresh
+//!
+//! [Rust Doc Crate]: https://img.shields.io/docsrs/tthresh
+//! [docs.rs]: https://docs.rs/tthresh/
+//!
+//! [Rust Doc Main]: https://img.shields.io/badge/docs-main-blue
+//! [docs]: https://juntyr.github.io/tthresh-rs/tthresh
+//!
+//! High-level bindigs to the [tthresh] compressor.
+//!
+//! [tthresh]: https://github.com/rballester/tthresh
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Target {
+/// Error bound
+pub enum ErrorBound {
+    /// Relative error
     Eps(f64),
+    /// Root mean square error
     RMSE(f64),
+    /// Peak signal-to-noise ratio
     PSNR(f64),
 }
 
-pub fn compress<T: Elem>(
+/// Buffer for typed decompressed data
+#[allow(missing_docs)]
+pub enum Buffer {
+    U8(Vec<u8>),
+    U16(Vec<u16>),
+    I32(Vec<i32>),
+    F32(Vec<f32>),
+    F64(Vec<f64>),
+}
+
+/// Compress the `data` buffer using the `target` error bound.
+///
+/// # Errors
+///
+/// Errors with
+/// - [`Error::InsufficientDimensionality`] if the `data`'s `shape` is not at least
+///   three-dimensional
+/// - [`Error::InvalidShape`] if the `shape` does not match the `data` length
+/// - [`Error::ExcessiveSize`] if the shape cannot be converted into [`u32`]s
+pub fn compress<T: Element>(
     data: &[T],
     shape: &[usize],
-    target: Target,
+    target: ErrorBound,
     verbose: bool,
     debug: bool,
-) -> Vec<u8> {
-    assert!(shape.len() >= 3);
-    assert_eq!(shape.iter().copied().product::<usize>(), data.len());
+) -> Result<Vec<u8>, Error> {
+    if shape.len() < 3 {
+        return Err(Error::InsufficientDimensionality);
+    }
+
+    if shape.iter().copied().product::<usize>() != data.len() {
+        return Err(Error::InvalidShape);
+    }
+
     let shape = shape
         .iter()
         .copied()
         .map(u32::try_from)
         .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+        .map_err(|_| Error::ExcessiveSize)?;
 
     let mut output = std::ptr::null_mut();
-    let mut noutput = 0;
+    let mut output_size = 0;
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code)] // FFI
     unsafe {
-        tthresh_sys::my_compress(
-            shape.as_ptr(),
-            shape.len(),
+        tthresh_sys::compress_buffer(
             data.as_ptr().cast::<std::ffi::c_char>(),
             T::IO_TYPE,
+            shape.as_ptr(),
+            shape.len(),
             std::ptr::from_mut(&mut output),
-            std::ptr::from_mut(&mut noutput),
+            std::ptr::from_mut(&mut output_size),
             match target {
-                Target::Eps(_) => tthresh_sys::Target_eps,
-                Target::RMSE(_) => tthresh_sys::Target_rmse,
-                Target::PSNR(_) => tthresh_sys::Target_psnr,
+                ErrorBound::Eps(_) => tthresh_sys::Target_eps,
+                ErrorBound::RMSE(_) => tthresh_sys::Target_rmse,
+                ErrorBound::PSNR(_) => tthresh_sys::Target_psnr,
             },
             match target {
-                Target::Eps(v) | Target::RMSE(v) | Target::PSNR(v) => v,
+                ErrorBound::Eps(v) | ErrorBound::RMSE(v) | ErrorBound::PSNR(v) => v,
             },
+            Some(alloc),
             verbose,
             debug,
         );
     }
 
-    let mut compressed = vec![0_u8; noutput];
-
     #[allow(unsafe_code)]
-    unsafe {
-        std::ptr::copy_nonoverlapping(output.cast::<u8>(), compressed.as_mut_ptr(), noutput);
-    }
+    // Safety: the output was allocated in Rust using `alloc` with the correct
+    //         size and alignment
+    let compressed = unsafe { Vec::from_raw_parts(output, output_size, output_size) };
 
-    #[allow(unsafe_code)]
-    unsafe {
-        tthresh_sys::dealloc_bytes(output);
-    }
-
-    compressed
+    Ok(compressed)
 }
 
-pub fn decompress<T: Elem>(compressed: &[u8], verbose: bool, debug: bool) -> (Vec<T>, Vec<usize>) {
-    let mut ds = std::ptr::null_mut();
-    let mut nd = 0;
+/// Deompress the `compressed` bytes into a [`Buffer`] and shape.
+///
+/// # Errors
+///
+/// Errors with
+/// - [`Error::ExcessiveSize`] if the output shape cannot be converted from [`u32`]s
+pub fn decompress(
+    compressed: &[u8],
+    verbose: bool,
+    debug: bool,
+) -> Result<(Buffer, Vec<usize>), Error> {
+    let mut shape = std::ptr::null_mut();
+    let mut shape_size = 0;
 
     let mut output = std::ptr::null_mut();
-    let mut noutput = 0;
-    let mut io_type = 0;
+    let mut output_type = 0;
+    let mut output_length = 0;
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code)] // FFI
     unsafe {
-        tthresh_sys::my_decompress(
-            std::ptr::from_mut(&mut ds),
-            std::ptr::from_mut(&mut nd),
+        tthresh_sys::decompress_buffer(
             compressed.as_ptr(),
             compressed.len(),
             std::ptr::from_mut(&mut output),
-            std::ptr::from_mut(&mut noutput),
-            std::ptr::from_mut(&mut io_type),
+            std::ptr::from_mut(&mut output_type),
+            std::ptr::from_mut(&mut output_length),
+            std::ptr::from_mut(&mut shape),
+            std::ptr::from_mut(&mut shape_size),
+            Some(alloc),
             verbose,
             debug,
         );
     }
 
-    assert_eq!(io_type, T::IO_TYPE);
-
-    let mut shape = vec![0_u32; nd];
+    #[allow(unsafe_code)]
+    // Safety: the shape was allocated in Rust using `alloc` with the correct
+    //         size and alignment
+    let shape = unsafe { Vec::from_raw_parts(shape, shape_size, shape_size) };
 
     #[allow(unsafe_code)]
-    unsafe {
-        std::ptr::copy_nonoverlapping(ds, shape.as_mut_ptr(), nd);
-    }
-
-    #[allow(unsafe_code)]
-    unsafe {
-        tthresh_sys::dealloc_shape(ds);
-    }
+    // Safety: the output was allocated in Rust using `alloc` with the correct
+    //         size and alignment
+    let decompressed = match output_type {
+        tthresh_sys::IOType_uchar_ => {
+            Buffer::U8(unsafe { Vec::from_raw_parts(output.cast(), output_length, output_length) })
+        }
+        tthresh_sys::IOType_ushort_ => {
+            Buffer::U16(unsafe { Vec::from_raw_parts(output.cast(), output_length, output_length) })
+        }
+        tthresh_sys::IOType_int_ => {
+            Buffer::I32(unsafe { Vec::from_raw_parts(output.cast(), output_length, output_length) })
+        }
+        tthresh_sys::IOType_float_ => {
+            Buffer::F32(unsafe { Vec::from_raw_parts(output.cast(), output_length, output_length) })
+        }
+        tthresh_sys::IOType_double_ => {
+            Buffer::F64(unsafe { Vec::from_raw_parts(output.cast(), output_length, output_length) })
+        }
+        #[allow(clippy::unreachable)]
+        _ => unreachable!("tthresh decompression returned an unknown output type"),
+    };
 
     let shape = shape
         .into_iter()
         .map(usize::try_from)
         .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+        .map_err(|_| Error::ExcessiveSize)?;
 
-    let mut decompressed = vec![T::ZERO; noutput / std::mem::size_of::<T>()];
+    Ok((decompressed, shape))
+}
 
-    #[allow(unsafe_code)]
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            output,
-            decompressed.as_mut_ptr().cast::<std::ffi::c_char>(),
-            noutput,
-        );
+#[derive(Debug, thiserror::Error)]
+/// Errors that can occur during compression and decompression with tthresh
+pub enum Error {
+    /// tthresh can only compress data with at least three dimensions
+    #[error("tthresh can only compress data with at least three dimensions")]
+    InsufficientDimensionality,
+    /// shape does not match the provided buffer
+    #[error("shape does not match the provided buffer")]
+    InvalidShape,
+    /// tthresh can only compress data whose shape sizes fit within [0; 2^32 - 1]
+    #[error("tthresh can only compress data whose shape sizes fit within [0; 2^32 - 1]")]
+    ExcessiveSize,
+}
+
+/// Marker trait for element types that can be compressed with tthresh
+pub trait Element: sealed::Element {}
+
+mod sealed {
+    pub trait Element: Copy {
+        const IO_TYPE: tthresh_sys::IOType;
+    }
+}
+
+impl Element for u8 {}
+impl sealed::Element for u8 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_uchar_;
+}
+
+impl Element for u16 {}
+impl sealed::Element for u16 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_ushort_;
+}
+
+impl Element for i32 {}
+impl sealed::Element for i32 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_int_;
+}
+
+impl Element for f32 {}
+impl sealed::Element for f32 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_float_;
+}
+
+impl Element for f64 {}
+impl sealed::Element for f64 {
+    const IO_TYPE: tthresh_sys::IOType = tthresh_sys::IOType_double_;
+}
+
+extern "C" fn alloc(size: usize, align: usize) -> *mut std::ffi::c_void {
+    #[allow(clippy::unwrap_used)]
+    let layout = std::alloc::Layout::from_size_align(size, align).unwrap();
+
+    // return a dangling pointer if the layout is zero-sized
+    if layout.size() == 0 {
+        #[allow(clippy::useless_transmute)]
+        // FIXME: use std::ptr::without_provenance_mut with MSRV 1.84
+        #[allow(unsafe_code)]
+        // Safety: usize -> *mut is always safe
+        return unsafe { std::mem::transmute(align) };
     }
 
     #[allow(unsafe_code)]
-    unsafe {
-        tthresh_sys::dealloc_bytes(output);
-    }
-
-    (decompressed, shape)
+    // Safety: layout is not zero-sized
+    unsafe { std::alloc::alloc_zeroed(layout) }.cast()
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
 
     #[test]
     fn compress_decompress() {
         let data = std::fs::read("tthresh-sys/tthresh/data/3D_sphere_64_uchar.raw")
-            .expect("missing input file");
+            .expect("input file should not be missing");
 
         let compressed = compress(
             data.as_slice(),
             &[64, 64, 64],
-            Target::PSNR(30.0),
+            ErrorBound::PSNR(30.0),
             true,
             true,
-        );
+        )
+        .expect("compression should not fail");
 
-        let (_decompressed, shape) = decompress::<u8>(compressed.as_slice(), true, true);
+        let (decompressed, shape) =
+            decompress(compressed.as_slice(), true, true).expect("decompression should not fail");
+        assert!(matches!(decompressed, Buffer::U8(_)));
         assert_eq!(shape, &[64, 64, 64]);
     }
 }

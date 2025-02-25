@@ -17,9 +17,15 @@
 
 # tthresh-sys
 
+Low-level bindigs to the [tthresh] compressor.
+
+[tthresh]: https://github.com/rballester/tthresh
+
 ## License
 
-Licensed under the Mozilla Public License, Version 2.0 ([LICENSE](LICENSE) or https://www.mozilla.org/en-US/MPL/2.0/).
+Licensed under the GNU General Public License, Version 3.0 ([LICENSE](LICENSE) or https://www.gnu.org/licenses/gpl-3.0-standalone.html).
+
+tthresh (the [`tthresh`](tthresh) folder) is licensed under the LGPL-3.0 license, see [`tthresh/LICENSE`](tthresh/LICENSE).
 
 ## Funding
 
