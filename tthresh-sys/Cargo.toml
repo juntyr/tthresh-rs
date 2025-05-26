@@ -12,6 +12,10 @@ readme = "README.md"
 categories = ["api-bindings", "compression", "encoding"]
 keywords = ["tthresh", "bindgen", "compression", "encoding"]
 
+links = "tthresh"
+
+exclude = ["/tthresh/data", "/tthresh/images"]
+
 [features]
 openmp = ["dep:openmp-sys"]
 
